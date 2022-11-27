@@ -96,12 +96,17 @@ f"\n    const MD5Final  = resolveAddress('{final}');\n"
     bv = binaryninja.open_view(binary, update_analysis=True)
 
     start = time.time()  #ignore open_view overhead in our timing
-    
-    gen = arch_mapping[arch][0](bv)
     actual = {}
-    for f in bv.functions:
-        if calcrel:=gen.calc_func_metadata(f):
-            actual[f.start] = calcrel
+
+    threads = [(f.start, arch_mapping[arch][0](bv, f)) for f in bv.functions]
+
+    #TODO figure out why async is slower than sync most of the time (binja calls are exclusive?)
+    for addr, t in threads:
+        t.start()
+
+    for addr, t in threads:
+        if gen:=t.join():
+            actual[addr] = gen
 
     end = time.time()
 
