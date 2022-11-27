@@ -100,7 +100,7 @@ f"\n    const MD5Final  = resolveAddress('{final}');\n"
     gen = arch_mapping[arch][0](bv)
     actual = {}
     for f in bv.functions:
-        if calcrel:=gen.calcrel(f):
+        if calcrel:=gen.calc_func_metadata(f):
             actual[f.start] = calcrel
 
     end = time.time()

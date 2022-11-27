@@ -20,14 +20,14 @@ class X86(Sig):
         #DataVariable is falsey, but List and Optional works
 
 
-    def getmask(self, d: CsInsn, f: Function):
+    def calcrel(self, d: CsInsn, f: Function):
         mask = bytes(d.size)
 
         #<opcode, disp_offset, imm_offset> - offsets are optional and can not exist
         #afaik x86 imm is always at the end
 
         if d.disp_offset: #consider references - any fs address, any relative memory accesses that's valid in program scope (see valid_loc def)
-            m = b'\xFF' if any(op.type == X86_OP_MEM and (op.reg == X86_REG_FS or (op.value.mem.base == X86_REG_RIP and self.valid_loc(op.value.mem.disp + d.address + d.size, f))) for op in d.operands) else b'\0'
+            m = b'\xFF' if any(op.type == X86_OP_MEM and (op.reg in [X86_REG_FS, X86_REG_GS] or (op.value.mem.base == X86_REG_RIP and self.valid_loc(op.value.mem.disp + d.address + d.size, f))) for op in d.operands) else b'\0'
             size = (d.imm_offset - d.disp_offset if d.imm_offset else d.size - d.disp_offset)
             mask = mask[:d.disp_offset] + m*size + mask[d.disp_offset+size:]
 
@@ -39,50 +39,44 @@ class X86(Sig):
 
         return mask
 
-    def calcrel(self, func: Function) -> tuple[str, bytes, bytes]:
-        inst = [i for i in func.instructions]
+    def calc_func_metadata(self, func: Function) -> tuple[str, bytes, bytes]:
+        ranges = func.address_ranges
 
-        func_end = func.address_ranges[-1].end
+        #dont check the portions of the function above func.start (aka no min([r.start for r in ranges])); seems like IDA doesnt care either and this speeds things up by a ton in binaries with exception handlers
+        func_start = func.start 
+        func_end = max([r.end for r in ranges])
 
-        ptr = func.start
-        while (f:=self.bv.get_function_at(self.bv.get_next_function_start_after(ptr))) and all(addr in range(func.start, func_end+1) for addr in [f.address_ranges[-1].end, f.start]):
-            ptr = f.start
-            inst += f.instructions
-
-        inst_bytes = [self.br.seek(i[1]) or self.br.read(self.bv.get_instruction_length(i[1])) for i in inst]
+        #print(hex(func.start), hex(func_start), hex(func_end))
 
         cap = Cs(CS_ARCH_X86, CS_MODE_64)  #seems like 64bit mode can still disassemble 32 bit completely fine
         cap.detail = True
-        #make offset to start of func so its easily referencable with the MD5 dump we get
-        #TODO check why disasm can't disassemble certain binja instructions
-        dis = [next(cap.disasm(b, i[1]), len(i)) for i, b in zip(inst, inst_bytes)]  #should always only have one result
-        #fallback to give size instead if failed
 
-        #if its in the valid proc address space then it counts as volatile
         #take the entire block of data including alignment into account (use size if disassembly is not available)
-        mask = [self.getmask(d, func) if isinstance(d, CsInsn) else bytes(d) for d in dis]
+        self.br.seek(func_start)
+        block = self.br.read(func_end - func_start)
+        #print(block.hex())
 
-        masked = [bytes([0 if m == 0xFF else b for m, b in zip(mb, bb)]) for mb, bb in zip(mask, inst_bytes)]
+        #linearly disassemble the entire block of bytes that the function encompasses (IDA does that instead of checking whether the bytes are accessible to the function or not)
+        dis = cap.disasm(block, func_start) 
 
+        maskblock = io.BytesIO(bytes(len(block)))
+        block = io.BytesIO(block)
+        #if its in the valid proc address space then it counts as volatile
+        for d in dis:
+            maskblock.seek(d.address - func_start)
+            block.seek(d.address - func_start)
 
-        assert len(mask) == len(masked) == len(inst) == len(inst_bytes)
+            mask = (self.calcrel(d, func))
+            data = bytes([b if m != 0xFF else 0 for m, b in zip(mask, block.read(len(mask)))])
 
+            maskblock.write(mask)
+            
+            block.seek(d.address - func_start)
+            block.write(data)
+        block = block.getvalue()
+        maskblock = maskblock.getvalue()
 
-        #write the masks back into the block of data that the function encompasses (not sure why IDA does that)
-        try:
-            self.br.seek(func.start)
-            maskblock = io.BytesIO(b'\0'*(func_end - func.start))
-            block = io.BytesIO(self.br.read(func_end - func.start))
-            for i in range(len(mask)):
-                block.seek(inst[i][1] - func.start)
-                maskblock.seek(inst[i][1] - func.start)
-                block.write(masked[i])
-                maskblock.write(mask[i])
-            block = block.getvalue()
-            maskblock = maskblock.getvalue()
-        except:
-            print("Function", func.name, "has references above func start (exception handlers?), aborting...")
-            return None
+        #print(block.hex())
 
         #compute MD5
         import hashlib

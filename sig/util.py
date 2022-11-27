@@ -10,5 +10,5 @@ class Sig:
         self.bv = bv
         self.br = BinaryReader(bv)
 
-    def calcrel(self, func: Function) -> tuple[str, bytes, bytes]:
+    def calc_func_metadata(self, func: Function) -> tuple[str, bytes, bytes]:
         raise NotImplementedError()
