@@ -128,11 +128,11 @@ f"\n    const MD5Final  = resolveAddress('{final}');\n"
     miss = 0
     cap = Cs(arch_mapping[arch][1], CS_MODE_64)
     for addr, hash, buf, mask in expected:  #we dont really care about binja exclusive functions i guess
-        if actual[addr][0] != hash:
+        if actual[addr][0].hex() != hash:
             if verbosity > 0:
                 print('\nFunction', hex(addr), 'mismatch:')
                 print('Expected:', hash)
-                print('Actual:', actual[addr][0])
+                print('Actual:', actual[addr][0].hex())
 
             if verbosity > 1:
                 #print('\n' + actual[addr][1].hex() + '\n' + actual[addr][2].hex() + '\n' + buf + '\n\n')

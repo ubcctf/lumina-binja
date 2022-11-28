@@ -1,8 +1,8 @@
 
 from binaryninja import Function
 
-from capstone import *
-from capstone.x86 import *
+from capstone import Cs, CsInsn, CS_ARCH_X86, CS_MODE_64
+from capstone.x86 import X86_REG_FS, X86_REG_GS, X86_REG_RIP, X86_OP_MEM, X86_OP_IMM
 
 import io
 
@@ -16,7 +16,7 @@ class X86(Sig):
         #also include if is pointing to start of instruction, but never mask same function jumps
         #sometimes there might be multiple functions at the same address even on the same architecture it seems like - we check all of them to see if any is the same function then reject
         #binja considers <0x1000 (header space) to be referenced by way too many non related things, so count it as an exception (somehow it considers any values used in instructions as references regardless of actually using it or not)
-        return offset > 0x1000 and ((self.bv.get_data_var_at(offset) is not None and next(self.bv.get_code_refs(offset), None) is not None) or ((others:=self.bv.get_functions_containing(offset)) and all(o.start != f.start and (inst:=o.get_instruction_containing_address(offset)) and inst == offset for o in others)))
+        return offset > 0x1000 and (((others:=self.bv.get_functions_containing(offset)) and all(o.start != f.start and (inst:=o.get_instruction_containing_address(offset)) and inst == offset for o in others)) or (self.bv.get_data_var_at(offset) is not None and next(self.bv.get_code_refs(offset), None) is not None))
         #DataVariable is falsey, but List and Optional works
 
 
@@ -46,15 +46,12 @@ class X86(Sig):
         func_start = func.start 
         func_end = max([r.end for r in ranges])
 
-        #print(hex(func.start), hex(func_start), hex(func_end))
-
         cap = Cs(CS_ARCH_X86, CS_MODE_64)  #seems like 64bit mode can still disassemble 32 bit completely fine
         cap.detail = True
 
         #take the entire block of data including alignment into account (use size if disassembly is not available)
         self.br.seek(func_start)
         block = self.br.read(func_end - func_start)
-        #print(block.hex())
 
         #linearly disassemble the entire block of bytes that the function encompasses (IDA does that instead of checking whether the bytes are accessible to the function or not)
         dis = cap.disasm(block, func_start) 
@@ -76,10 +73,8 @@ class X86(Sig):
         block = block.getvalue()
         maskblock = maskblock.getvalue()
 
-        #print(block.hex())
-
         #compute MD5
         import hashlib
 
-        hash = hashlib.md5(block + maskblock).digest().hex()
+        hash = hashlib.md5(block + maskblock).digest()
         return hash, block, maskblock
