@@ -5,12 +5,12 @@ from capstone import *
 
 import time
 
-from sig.x86 import X86
+from sig.util import ARCH_MAPPING
 
 import os, subprocess
 
 
-arch_mapping = {'x86': (X86, CS_ARCH_X86)}
+cs_mapping = {'x86': CS_ARCH_X86, 'x86_64': CS_ARCH_X86}
 
 IDA_PATH = os.path.realpath(os.environ['IDADIR']) + os.path.sep
 
@@ -97,7 +97,7 @@ f"\n    const MD5Final  = resolveAddress('{final}');\n"
 
     start = time.time()  #ignore open_view overhead in our timing
     
-    gen = arch_mapping[arch][0](bv)
+    gen = ARCH_MAPPING[arch](bv)
     actual = {}
     for f in bv.functions:
         if calcrel:=gen.calc_func_metadata(f):
@@ -126,7 +126,7 @@ f"\n    const MD5Final  = resolveAddress('{final}');\n"
         print()
 
     miss = 0
-    cap = Cs(arch_mapping[arch][1], CS_MODE_64)
+    cap = Cs(cs_mapping[arch], CS_MODE_64)
     for addr, hash, buf, mask in expected:  #we dont really care about binja exclusive functions i guess
         if actual[addr][0].hex() != hash:
             if verbosity > 0:

@@ -14,8 +14,8 @@ class Sig:
         raise NotImplementedError()
 
 
-#metaclass like how binja implements it's subscriptable Architecture class
-#have to do this coz otherwise we end up with circular import
+#metaclass like how binja implements its subscriptable Architecture class
+#have to do this to lazy load; otherwise we end up with circular import
 class _mapping(type):
     def __init__(self, name, bases, dict) -> None:
         super().__init__(name, bases, dict)
