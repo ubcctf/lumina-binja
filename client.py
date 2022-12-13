@@ -20,7 +20,7 @@ class LuminaClient:
     def is_valid(self, bv: BinaryView, func: Function = None):
         return self.socket and (func.arch.name in ARCH_MAPPING if func else True)
     
-    def send_and_recv_rpc(self, code: RPC_TYPE, **kwargs):
+    def send_and_recv_rpc(self, code: RPC_TYPE, noretry: bool = False, **kwargs):
         try: 
             with self.lock: #only lock if not already in critical section (see reconnect())
                 payload = rpc_message_build(code, **kwargs)
@@ -31,9 +31,11 @@ class LuminaClient:
                 log.log_debug('Received ' + str(packet) + 'Message: ' + str(message) + '')
                 return packet, message
         except (ConnectionError, con.StreamError):
-            log.log_warn('Disconnected from the Lumina server. Reconnecting...')
-            self.reconnect()
-            return self.send_and_recv_rpc(code, **kwargs)  #retry
+            log.log_warn('Disconnected from the Lumina server.' + ('' if noretry else ' Reconnecting...'))
+            if not noretry:
+                self.reconnect()
+                return self.send_and_recv_rpc(code, **kwargs)  #retry
+            return (None, None)
         except Exception as e:
             log.log_error('Something went wrong: ' + str(type(e)) + ': ' + str(e))
             return (None, None)
@@ -60,7 +62,7 @@ class LuminaClient:
                 try:
                     keypath = s.get_string('lumina.key')
                     if keypath:
-                        with open(key, 'rb') as kf:
+                        with open(keypath, 'rb') as kf:
                             key = kf.read()
                     else:
                         key = b''
@@ -69,7 +71,8 @@ class LuminaClient:
                     key = b''
 
                 #TODO reverse hexrays id and watermark to support genuine IDA licenses?
-                if(self.send_and_recv_rpc(RPC_TYPE.RPC_HELO, protocol=2, hexrays_license=key, hexrays_id=0, watermark=0, field_0x36=0)[0].code != RPC_TYPE.RPC_OK):
+                resp = self.send_and_recv_rpc(RPC_TYPE.RPC_HELO, noretry=True, protocol=2, hexrays_license=key, hexrays_id=0, watermark=0, field_0x36=0)[0]
+                if(not resp or resp.code != RPC_TYPE.RPC_OK):
                     raise ConnectionError('Handshake failed (Invalid key?)')
 
                 log.log_info('Connection to Lumina server ' +  host[0] + ':' + str(host[1]) + ' (TLS: ' + str(bool(cert)) + ') succeeded.')
@@ -143,7 +146,7 @@ class LuminaClient:
         #TODO pop up saying "pulling function metadata..."?
         msg = self.send_and_recv_rpc(RPC_TYPE.PULL_MD, **(craft_pull_md(bv, [func])[0]))[1]
 
-        if msg:
+        if msg and msg.results:
             apply_md(bv, func, msg.results[0])
             log.log_info('Pulled metadata for function "' + func.name + '" successfully.')
                 

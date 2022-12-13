@@ -7,7 +7,7 @@ import time
 
 from sig.util import ARCH_MAPPING
 
-import os, subprocess
+import os, subprocess, sys
 
 
 cs_mapping = {'x86': CS_ARCH_X86, 'x86_64': CS_ARCH_X86}
@@ -180,5 +180,4 @@ f"\n    const MD5Final  = resolveAddress('{final}');\n"
 
 
 if __name__ == "__main__":
-    import sys
     check_against_ida(sys.argv[1], int(sys.argv[2]) if len(sys.argv) > 2 else 2, 'x86') #only x86 is supported atm

@@ -23,4 +23,4 @@ IDA's [Lumina](https://hex-rays.com/products/ida/lumina/) feature, reimplemented
 
 **Maple Bacon maintainers:**
  - [@nneonneo](https://github.com/nneonneo) for metadata reversing and implementation
- - [@despawningbone](https://github.com/despawningbone) for signature generation reversing, and stitching everything together
+ - [@desp](https://github.com/despawningbone) for signature generation reversing, and stitching everything together
