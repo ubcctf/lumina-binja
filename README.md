@@ -4,7 +4,7 @@ IDA's [Lumina](https://hex-rays.com/products/ida/lumina/) feature, reimplemented
 **CURRENTLY IN ACTIVE DEVELOPMENT - NOTHING IS FULLY STABLE YET**
 
 ## Features
- - Compatible with existing public Lumina databases, including TLS support
+ - Compatible with existing public Lumina databases (both official[^1] and unofficial), including TLS support
  - Signatures largely match IDA's implementation, enabling cross-diassembler collaboration (~85% accuracy, including discrepancies in analysis between disassemblers)
  - Supported Architectures:
    - [x] x86 / x86_64
@@ -24,3 +24,5 @@ IDA's [Lumina](https://hex-rays.com/products/ida/lumina/) feature, reimplemented
 **Maple Bacon maintainers:**
  - [@nneonneo](https://github.com/nneonneo) for metadata reversing and implementation
  - [@desp](https://github.com/despawningbone) for signature generation reversing, and stitching everything together
+
+[^1]: Provided that you have specified a valid IDA license file as the key file in the settings, along the valid certificate to connect to `lumina.hex-rays.com`, as obtainable [from official sources](https://hex-rays.com/products/ida/lumina/lumina-cert-20191010/).

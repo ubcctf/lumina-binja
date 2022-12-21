@@ -59,21 +59,26 @@ class LuminaClient:
                     context.load_verify_locations(cert)
                     self.socket = context.wrap_socket(self.socket, server_hostname=host[0])
 
+                key, id = b'', bytes(6)
                 try:
                     keypath = s.get_string('lumina.key')
                     if keypath:
                         with open(keypath, 'rb') as kf:
                             key = kf.read()
-                    else:
-                        key = b''
+                            if key.startswith(b'HEXRAYS_LICENSE'):    #looks like genuine license, parse id
+                                #id is from the line with IDAPRO*W in it
+                                id = bytes.fromhex(key.split(b' IDAPRO')[0].split(b'\n')[-1].replace(b'-', b'').decode())
+                                if len(id) != 6:   #must be 6 bytes long, if not something went wrong
+                                    id = bytes(6)  #reset into empty bytes
+                                    raise ValueError()
                 except OSError:
                     log.log_warn('Lumina key file path is invalid, ignoring...')
-                    key = b''
+                except ValueError:
+                    log.log_warn('Given Hexrays license file seems malformed, skipping parsing...')
 
-                #TODO reverse hexrays id and watermark to support genuine IDA licenses?
-                resp = self.send_and_recv_rpc(RPC_TYPE.RPC_HELO, noretry=True, protocol=2, hexrays_license=key, hexrays_id=0, watermark=0, field_0x36=0)[0]
-                if(not resp or resp.code != RPC_TYPE.RPC_OK):
-                    raise ConnectionError('Handshake failed (Invalid key?)')
+                resp, msg = self.send_and_recv_rpc(RPC_TYPE.RPC_HELO, noretry=True, protocol=2, hexrays_license=key, hexrays_id=id, field_0x36=0)
+                if not resp or resp.code != RPC_TYPE.RPC_OK:
+                    raise ConnectionError('Handshake failed ' + (f'({msg.message})' if resp and resp.code == RPC_TYPE.RPC_FAIL else '(connection failure)'))
 
                 log.log_info('Connection to Lumina server ' +  host[0] + ':' + str(host[1]) + ' (TLS: ' + str(bool(cert)) + ') succeeded.')
             except Exception as e:
