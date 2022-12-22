@@ -73,7 +73,7 @@ def craft_push_md(bv: BinaryView, funcs: list[Function], task: BackgroundTask = 
             task.progress = progress.format(count=i)
 
     return {
-        "field_0x10": 0, 
+        "type": PushMdOpt.PUSH_OVERRIDE_IF_BETTER,  #protocol 2 default
         "idb_filepath": bv.file.filename, 
         "input_filepath": bv.file.original_filename, 
         "input_md5": Transform['MD5'].encode(buf),
@@ -106,9 +106,8 @@ def craft_pull_md(bv: BinaryView, funcs: list[Function], task: BackgroundTask = 
             sigs.append({'signature':ARCH_MAPPING[func.arch.name](bv).calc_func_metadata(func)[0]})
             i+=1
 
-        #already grouped, the first one will have the same arch as the rest
-        mds.append({'flags': 1 if fs[0].arch.address_size == 8 else 0, 
-            'ukn_list':[0]*len(fs),
+        mds.append({'flags': 1,  #protocol 2 default
+            'types':[],
             'funcInfos':sigs})
 
     return mds

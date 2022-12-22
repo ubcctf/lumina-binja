@@ -112,9 +112,9 @@ class LuminaClient:
                     if msg:
                         it = iter(msg.results) #also results only have valid mds so its easier to model with iterator
                         for i, found in enumerate(msg.found):
-                            if not found: #0 means found for some reason? 
+                            if found == ResultType.RES_OK:
                                 apply_md(bv, copy[i], next(it))
-                        log.log_info('Pulled ' + str(len(msg.found) - sum(msg.found)) + '/' + str(len(msg.found)) + ' functions successfully.')
+                        log.log_info('Pulled ' + str(sum([d == ResultType.RES_OK for d in msg.found])) + '/' + str(len(msg.found)) + ' functions successfully.')
 
         RunPull('[Lumina] Pulling metadata...', True).start()  #doesnt matter if we copy or not here
 
@@ -133,7 +133,7 @@ class LuminaClient:
                 msg = send_and_recv_rpc(RPC_TYPE.PUSH_MD, **kwargs)[1]
 
                 if msg:
-                    log.log_info('Pushed ' + str(sum(msg.resultsFlags)) + '/' + str(len(msg.resultsFlags)) + ' functions successfully.')
+                    log.log_info('Pushed ' + str(sum([d == ResultType.RES_ADDED for d in msg.resultsFlags])) + '/' + str(len(msg.resultsFlags)) + ' functions successfully.')
 
         RunPush('[Lumina] Pushing metadata...', True).start()  #doesnt matter if we copy or not here
 
