@@ -1,4 +1,4 @@
-from binaryninja import BinaryView, Function, BackgroundTask
+from binaryninja import BinaryView, Function, BackgroundTask, Type
 from binaryninja.transform import Transform
 from binaryninja.log import log_debug
 
@@ -7,8 +7,9 @@ import socket, itertools
 from construct import *
 from lumina_structs import *
 from lumina_structs.metadata import *
-
+    
 from .sig.util import Sig, ARCH_MAPPING
+from .type import construct_type
 
 #
 # Push Functions
@@ -44,8 +45,6 @@ def extract_md(bv: BinaryView, func: Function, gen: Sig) -> dict:
                 "func_name": func.name,  #func name is automatically whatever it should be
                 "func_size": len(block),
                 "serialized_data": {
-                    #TODO use construct instead of this workaround to get the byte length
-                    "size": len(b''.join([MetadataType.build(c['type']) + Metadata.build(c['data'], code=c['type']) for c in chunks])),  
                     "chunks": chunks}},
             "signature": {
                 "version": 1, 
@@ -116,6 +115,10 @@ def craft_pull_md(bv: BinaryView, funcs: list[Function], task: BackgroundTask = 
 
 def apply_md(bv: BinaryView, func: Function, info: Container):
     #we don't really care about popularity atm, but it might be useful server side for sorting
+
+    #IDA (at least on 7.5) hardcoded no-override flag into apply_metadata, so tinfo and frame desc effectively never gets applied even if existing data is entirely auto-generated
+    #we won't follow that - manually clearing the data on every lumina pull is very annoying and there is undo anyway
+    #instead we will default to resetting metadata to what lumina provides on conflict
     func.name = info.metadata.func_name
     #func size should be the same to be able to get the same signature, so no need to set
     for md in info.metadata.serialized_data.chunks:
@@ -131,6 +134,21 @@ def apply_md(bv: BinaryView, func: Function, info: Container):
                 addr = func.start + c.offset
                 #only | if is not empty string
                 func.set_comment_at(addr, ' | '.join(filter(bool, [c.anterior, (cmt if (cmt:=func.get_comment_at(addr)) else ''), c.posterior])))
+        elif md.type == MetadataType.MD_TYPE_INFO:
+            t = construct_type(bv, md.data.tinfo, md.data.names)
+            #TODO handle argloc with set_call_reg_*(?)
+            func.function_type = t
+        elif md.type == MetadataType.MD_FRAME_DESC:
+            #binja doesnt have the variable definition section for comments storage, so discard for now; also repr as a concept doesnt exist in binja
+            for var in md.data.vars:
+                #sometimes type == None if its default so just treat it as byte array of nbytes
+                t = construct_type(bv, var.type.tinfo, var.type.names, var.nbytes) if var.type else Type.array(Type.int(1, sign=False, alternate_name='byte'), var.nbytes)
+                name = var.name if var.name else f'lumina_{hex(var.off)}'
+
+                #TODO check if this still matches in architectures with stack growing up
+                func.delete_auto_stack_var(-(md.data.frsize - var.off + md.data.frregs))  #binja uses rbp instead of rsp (offset goes down instead of up)
+                func.create_user_stack_var(-(md.data.frsize - var.off + md.data.frregs), t, name)  #auto var gets overwritten by reanalysis
+            func.reanalyze()
         else:
             #logger is likely already instantiated by client.py, we can just invoke it with the name now
             log_debug('Unimplemented metadata type ' + str(md.type) + ', skipping for now...', logger='Lumina')

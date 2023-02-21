@@ -14,8 +14,22 @@ IDA's [Lumina](https://hex-rays.com/products/ida/lumina/) feature, reimplemented
  - Supported metadata types:
    - [x] function names
    - [x] comments
-   - [ ] stack frame info (e.g. variable names, stack offsets, types)
-   - [ ] function type info
+     - [x] instruction level comments
+     - [x] function level comments
+     - [ ] variable comments (unsupported by Binary Ninja)
+   - [x] function type info (WIP - currently parsing only)
+     - [x] calling conventions
+       - [x] generic conventions
+       - [ ] custom conventions (parsed, but unsupported by Binary Ninja)
+         - [ ] spoiled registers
+         - [ ] arbitrary argument locations/storage
+     - [x] return type
+     - [x] parameter types
+     - [x] stack frame info
+       - [x] variable names
+       - [x] variable offsets and sizes
+       - [x] variable types
+ - All type info are supported, except structs and enums due to limitations of the current Lumina specification
 
 ## Credits
  - [Lumen](https://github.com/naim94a/lumen) for most of the RPC protocol reversing
@@ -23,6 +37,6 @@ IDA's [Lumina](https://hex-rays.com/products/ida/lumina/) feature, reimplemented
 
 **Maple Bacon maintainers:**
  - [@nneonneo](https://github.com/nneonneo) for metadata reversing and implementation
- - [@desp](https://github.com/despawningbone) for signature generation reversing, and stitching everything together
+ - [@desp](https://github.com/despawningbone) for signature generation and tinfo reversing, and stitching everything together
 
 [^1]: Provided that you have specified a valid IDA license file as the key file in the settings, along the valid certificate to connect to `lumina.hex-rays.com`, as obtainable [from official sources](https://hex-rays.com/products/ida/lumina/lumina-cert-20191010/).
